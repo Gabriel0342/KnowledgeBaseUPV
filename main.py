@@ -1,6 +1,7 @@
 """
 Log:
 - YYYY-MM-DD - [NAME]: Describe the improvement made in this file.
+- 2026-10-10 - [Guilherme Silva]: Improve CLI interface
 """
 
 '''Impedir que quem nao respeite as regras faça commits and pushs'''

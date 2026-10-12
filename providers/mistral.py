@@ -1,14 +1,17 @@
 """
 Log:
 - YYYY-MM-DD - [NAME]: Describe the improvement made in this file.
+- 2026-10-12 - [Guilherme Silva]: Added the ability to create videos and to play them.
 """
 
-import base64
+import shutil
+import subprocess as standard_subprocess
 import json
 import os
 import pathlib
 from pydoc import text
 import re
+import tempfile
 from mistralai.client import Mistral
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -231,9 +234,9 @@ def speak_with_model_about_notes(question, option, key):
                                 audio = r.listen(source, timeout=None, phrase_time_limit=None) # type: ignore
 
                             texto = r.recognize_google(audio, language="pt-PT") # type: ignore
-                            print(f"Foi dito: {texto}")
+                            print(f"It was said: {texto}")
                             question = texto
-                            #speak_with_model_about_notes(question)
+                            model_output(prompt, returned_files, question, mistral_client)
 
                             if texto.lower() in ["exit", "stop"]:
                                 exit(0)
@@ -261,9 +264,9 @@ def speak_with_model_about_notes(question, option, key):
                         answer = model_output(prompt, returned_files, question, mistral_client)
                         os.system('cls')
                         print(f"\033[92mAnswer:\033[0m {answer}")
-
-                    elif option == "video":
-                        print(f"\033[92mGenerating video...\033[0m")
+                        input("\033[93mPress Enter to continue...\033[0m")
+                        os.system('cls')
+                        
 
                     elif option == "summary":
                         prompt = f'''You are a very good person to do summaries, and you will receive a text, and you will need to create a very good summary of that text, 
@@ -338,17 +341,251 @@ def speak_with_model_about_notes(question, option, key):
                             print(f"\033[91mUnexpected error: {e}\033[0m")
 
                     elif option == "flashcards":
-                        print(f"\033[92mGenerating flashcards...\033[0m")
+                        prompt = f'''You are a very good person to create flashcards, and you will receive a request, and you will need to create a very good flashcards of that request,
+                            with the most important points of the content, and you will return the flashcards in a JSON format, like this:
+                            [
+                                {{
+                                    "question": "Question 1",
+                                    "answer": "Answer 1"
+                                }},
+                                {{
+                                    "question": "Question 2",
+                                    "answer": "Answer 2"
+                                }}
+                            ] I only want the JSON, nothing else, and you will not answer any questions, only create the flashcards. And 10 flashcards is the maximum you can create, if the content is too big, you will create only 10 flashcards, and you will not create more than 10 flashcards.'''
+                        answer = "[" + extract_json_object(model_output(prompt, returned_files, question, mistral_client)) + "]"
+                        os.system('cls')
+                        try:
+                            json_flashcards = json.loads(answer)
+                            if isinstance(json_flashcards, list):
+                                for i, card in enumerate(json_flashcards):
+                                    print(f"\033[92mFlashcard {i + 1}:\033[0m\n")
+                                    print(f"Question: {card.get('question')}")
+                                    input("\033[93mPress Enter to see the answer...\033[0m")
+                                    print(f"Answer: {card.get('answer')}\n")
+                                    input("\033[93mPress Enter to continue to the next flashcard...\033[0m")
+                                    os.system('cls')
+                            else:
+                                print(f"\033[91mError: The model did not return a valid JSON for the flashcards.\033[0m")
+                        except json.JSONDecodeError:
+                            print(f"\033[91mError: The model did not return a valid JSON for the flashcards.\033[0m")
+                            print(f"\033[91mModel output:\033[0m {answer}")
+                        except Exception as e:
+                            print(f"\033[91mUnexpected error: {e}\033[0m")
+                        
+                    elif option == "video":
+                        prompt = """
+                            Write a complete, runnable Python script using the Manim Community library
+                            (16:9 widescreen layout).
 
+                            Crucial requirements:
+                            - Respond ONLY with raw Python code (no explanations and no Markdown fences).
+                            - Match the language of the prompt for on-screen text.
+                            - Use ONLY Text(...) for typography and labels. NEVER use Tex(...),
+                            MathTex(...), or BulletedList(...), because LaTeX is not installed.
+                            - Use only standard colors (WHITE, BLACK, BLUE, RED, GREEN, YELLOW, ORANGE,
+                            PURPLE, GRAY) or hex strings such as '#2A9D8F'.
+                            - When using Code(...), pass ONLY code_string='...' and language='python'.
+                            Do not pass style, code_style, font, or font_name arguments.
+                            - Write(...) only accepts one vectorized mobject. Use Write(text), Write(line),
+                            or another individual VMobject. NEVER call Write(...) with Group(...),
+                            VGroup(...), a Python list, or a container of mobjects. To write several
+                            mobjects, use LaggedStart(*[Write(item) for item in items]).
+                            - Use Group(...) only when a group itself is the target of an operation that
+                            supports groups, such as FadeOut(group). Do not reuse that group with Write.
+                            - Do not use VGroup(*self.mobjects) for cleanup; use Group(*self.mobjects).
+                            - Design every scene for the actual Manim frame. Keep all content
+                            inside a safe area with one unit of margin on every side; do not
+                            place content at the extreme left or right edges.
+                            - Never put a long sentence on one line. Split long text into multiple
+                            lines with '\\n', use short bullet points, and use font_size between
+                            24 and 40 for body text. A list must fit vertically as well as
+                            horizontally; show fewer items per scene when necessary.
+                            - Prefer arranging text with VGroup(...).arrange(DOWN, buff=...) and
+                            then call group.scale_to_fit_width(config.frame_width - 1)
+                            and group.scale_to_fit_height(config.frame_height - 1) when needed.
+                        """
+                        answer = model_output(prompt, returned_files, question, mistral_client)
+                        run_video(answer, quality="l", preview=True)
+                        return
+
+                except Exception as e:
+                    print(f"\033[91mError: {e}. Retrying...\033[0m")
+                    time.sleep(1)
+                    continue
+
+def run_video(code_str: str, quality: str = "l", preview: bool = True): # This function was maded by AI but tested several times by a human
+    # 1. Strip Markdown fences and non-breaking spaces
+    clean = re.sub(r"^```python\s*|^```\s*", "", code_str.strip())
+    clean = re.sub(r"```$", "", clean).strip().replace("\xa0", " ")
+
+    # 2. Fix Code(...) argument incompatibilities1
+    clean = re.sub(r"\bCode\(\s*code\s*=", "Code(code_string=", clean)
+    clean = re.sub(
+        r",\s*(?:code_)?style\s*=\s*['\"][^'\"]*['\"]",
+        "",
+        clean,
+    )
+    clean = re.sub(
+        r"(?:code_)?style\s*=\s*['\"][^'\"]*['\"],\s*",
+        "",
+        clean,
+    )
+    clean = re.sub(
+        r",\s*font(?:_name)?\s*=\s*['\"][^'\"]*['\"]",
+        "",
+        clean,
+    )
+    clean = re.sub(
+        r"font(?:_name)?\s*=\s*['\"][^'\"]*['\"],\s*",
+        "",
+        clean,
+    )
+
+    # 3. Replace VGroup(*self.mobjects) with Group(*self.mobjects)
+    clean = re.sub(
+        r"VGroup\(\s*\*\s*\[([^\]]*self\.mobjects[^\]]*)\]\s*\)",
+        r"Group(*[\1])",
+        clean,
+    )
+
+    # 4. Inject compatibility helpers and responsive text sizing
+    fallbacks = (
+        "# Auto-injected compatibility helpers\n"
+        "try:\n"
+        "    ORANGE_E\n"
+        "except NameError:\n"
+        "    ORANGE_E = interpolate_color(ORANGE, BLACK, 0.5)\n"
+        "try:\n"
+        "    ORANGE_D\n"
+        "except NameError:\n"
+        "    ORANGE_D = interpolate_color(ORANGE, BLACK, 0.25)\n"
+        "try:\n"
+        "    PURPLE_E\n"
+        "except NameError:\n"
+        "    PURPLE_E = interpolate_color(PURPLE, BLACK, 0.5)\n"
+        "try:\n"
+        "    LIGHT_PURPLE\n"
+        "except NameError:\n"
+        "    LIGHT_PURPLE = interpolate_color(PURPLE, WHITE, 0.5)\n\n"
+        "class BulletedList(VGroup):\n"
+        "    def __init__(self, *items, font_size=28, buff=0.4, **kwargs):\n"
+        "        dots_and_text = []\n"
+        "        for item in items:\n"
+        "            dot = Dot()\n"
+        "            txt = Text(\n"
+        "                str(item),\n"
+        "                font_size=font_size,\n"
+        "                **{\n"
+        "                    key: value\n"
+        "                    for key, value in kwargs.items()\n"
+        "                    if key in ['color']\n"
+        "                },\n"
+        "            )\n"
+        "            row = VGroup(dot, txt).arrange(RIGHT, buff=0.2)\n"
+        "            dots_and_text.append(row)\n"
+        "        super().__init__(*dots_and_text)\n"
+        "        self.arrange(DOWN, aligned_edge=LEFT, buff=buff)\n"
+        "\n"
+        "_OriginalText = Text\n"
+        "\n"
+        "class _SafeText(_OriginalText):\n"
+        "    def __init__(self, *args, **kwargs):\n"
+        "        super().__init__(*args, **kwargs)\n"
+        "\n"
+        "        # Leave one unit of margin on every side of the active frame.\n"
+        "        max_width = max(config.frame_width - 1.0, 1.0)\n"
+        "        max_height = max(config.frame_height - 1.0, 1.0)\n"
+        "\n"
+        "        if self.width > max_width:\n"
+        "            self.scale_to_fit_width(max_width)\n"
+        "\n"
+        "        if self.height > max_height:\n"
+        "            self.scale_to_fit_height(max_height)\n"
+        "\n"
+        "Text = _SafeText\n"
+    )
+
+    if "from manim import *" in clean:
+        clean = clean.replace(
+            "from manim import *",
+            f"from manim import *\n\n{fallbacks}\n",
+            1,
+        )
+    else:
+        clean = f"from manim import *\n\n{fallbacks}\n\n{clean}"
+
+    # 5. Detect the generated Scene class
+    match = re.search(
+        r"class\s+([A-Za-z0-9_]+)\s*\(\s*Scene\s*\):",
+        clean,
+    )
+
+    if not match:
+        print("\033[91mError:\033[0m Couldn't find a Scene class.")
+        return
+
+    scene_name = match.group(1)
+    output_folder = os.path.abspath("videos")
+    os.makedirs(output_folder, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        script_path = os.path.join(tmp_dir, "scene.py")
+        media_path = os.path.join(tmp_dir, "media")
+
+        with open(script_path, "w", encoding="utf-8") as file:
+            file.write(clean)
+
+        command = [
+            "manim",
+            f"-q{quality}",
+            "--media_dir",
+            media_path,
+            script_path,
+            scene_name,
+        ]
+
+        print(f"\033[94mRendering {scene_name}...\033[0m")
+
+        result = standard_subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            error_output = result.stderr or result.stdout
+            print(f"\033[91mManim render failed:\033[0m\n{error_output}")
+            return
+
+        temp_video = None
+
+        for root, _, files in os.walk(media_path):
+            for file_name in files:
+                if file_name.endswith(".mp4"):
+                    temp_video = os.path.join(root, file_name)
                     break
-                except Exception as e:
-                    print(f"\033[91mError: {e}. Retrying...\033[0m")
-                    time.sleep(1)
-                    continue
-                except Exception as e:
-                    print(f"\033[91mError: {e}. Retrying...\033[0m")
-                    time.sleep(1)
-                    continue
+
+            if temp_video:
+                break
+
+        if not temp_video:
+            print("\033[91mError:\033[0m No video file was generated.")
+            return
+
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        target_name = f"{scene_name}_{timestamp}.mp4"
+        saved_video_path = os.path.join(output_folder, target_name)
+
+        shutil.copy2(temp_video, saved_video_path)
+
+        print(f"\033[92mVideo saved to:\033[0m {saved_video_path}")
+
+    print("\033[90mCleaned up intermediate build cache.\033[0m")
+
+    if preview:
+        print("\033[94mOpening video...\033[0m")
+        os.startfile(saved_video_path)
 
 def model_output(prompt, returned_files, question, mistral_client):
     mistral_response = mistral_client.chat.complete(model="mistral-large-latest", messages=[
