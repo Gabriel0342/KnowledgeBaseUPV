@@ -3,6 +3,8 @@ Log:
 - YYYY-MM-DD - [NAME]: Describe the improvement made in this file.
 """
 
+'''Impedir que quem nao respeite as regras faça commits and pushs'''
+
 from providers.mistral import *
 from providers.base import ModelProvider
 
@@ -38,8 +40,9 @@ def main():
                 
             elif choice == "2":
                 print("\033[93mThis isn't perfect yet, It still in development.\033[0m")
+                exit(1)
                 # Here you will use the speech text recognition
-                r = sr.Recognizer()
+                '''r = sr.Recognizer()
                 r.pause_threshold = 1
                 r.dynamic_energy_threshold = True
                 while True:
@@ -62,21 +65,25 @@ def main():
                     except sr.WaitTimeoutError:
                         print("Waiting for you to speak...")
                     except sr.RequestError as e:
-                        print(f"Error: {e}")
+                        print(f"Error: {e}")'''
             
             elif choice == "3":
+                os.system('cls')
                 question = input("Enter your question about the notes: ")
                 ModelProvider("Mistral", os.getenv("PROVIDER_KEY")).speak_with_model(question, "summary")
 
             elif choice == "4":
+                os.system('cls')
                 question = input("Enter your theme to create a quiz about: ")
                 ModelProvider("Mistral", os.getenv("PROVIDER_KEY")).speak_with_model(question, "quizz")
 
             elif choice == "5":
+                os.system('cls')
                 question = input("Enter your question about the notes: ")
                 ModelProvider("Mistral", os.getenv("PROVIDER_KEY")).speak_with_model(question, "flashcards")
 
             elif choice == "6":
+                os.system('cls')
                 question = input("Enter your question about the notes: ")
                 ModelProvider("Mistral", os.getenv("PROVIDER_KEY")).speak_with_model(question, "video")
 

@@ -9,11 +9,11 @@
 
  - [ ] Guardar conversas, perguntas, respostas, avaliações e progresso numa base de dados persistente.
  - [ ] Memória controlável por tópico, permitindo ao aluno corrigir ou apagar factos guardados sobre si.
- - [ ] Contexto personalizado por disciplina, turma e objetivo de estudo.
- - [ ] Escolha do modo de estudo: como temos no NotebookLM.
+ - [ ] Contexto personalizado por disciplina e objetivo de estudo.
+ - [ X ] Escolha do modo de estudo: como temos no NotebookLM.
  - [ ] Ajuste automático da dificuldade com base nos erros e acertos recentes.
  - [ ] Planos de estudo adaptativos com metas, prazos, lembretes e revisão espaçada.
- - **[ ] Ter uma branch para os vários modelos que vão sendo utilizados (ex: OpenAI, Antropic, Mistral, Ollama, Qwen, ...)**
+ - **[ ] Ter vários ficheiros para os vários modelos que vão sendo utilizados (ex: OpenAI, Antropic, Mistral, Ollama, Qwen, ...)**
 
  ## 3. Conteúdo criado pelos alunos
 
